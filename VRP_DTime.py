@@ -2,37 +2,11 @@ from datetime import datetime, timedelta
 from ortools.constraint_solver import routing_enums_pb2
 from ortools.constraint_solver import pywrapcp
 
-def solve_full_pizza_vrptw_with_datetime():
-    # =========================================================================
-    # 1. THE DATA PAYLOAD
-    # =========================================================================
-    data = {}
-    data['num_vehicles'] = 2
-    data['starts'] = [0, 1]
-    data['ends']   = [0, 1]
-    
-    # 0:Store1, 1:Store2, 2:Pick1, 3:Drop1, 4:Pick2, 5:Drop2, 6:Pick3, 7:Drop3
-    data['time_matrix'] = [
-        [0,  12,  0,  15, 12, 22,  0,  25],
-        [12,  0, 12,  20,  0, 10, 12,  18],
-        [0,  12,  0,  15, 12, 22,  0,  25],
-        [15, 20, 15,   0, 20, 14, 15,  30],
-        [12,  0, 12,  20,  0, 10, 12,  18],
-        [22, 10, 22,  14, 10,  0, 22,  15],
-        [0,  12,  0,  15, 12, 22,  0,  25],
-        [25, 18, 25,  30, 18, 15, 25,   0],
-    ]
-
-    data['pickups_deliveries'] = [[2, 3], [4, 5], [6, 7]]
-    data['demands'] = [0, 0, 1, -1, 1, -1, 1, -1]
-    data['vehicle_capacities'] = [2, 2]
-
-    # Target Windows (Earliest, Target Latest)
-    data['time_windows'] = [
-        (0, 120), (0, 120), (0, 15), (10, 20),
-        (0, 15), (10, 20), (0, 25), (25, 35),
-    ]
-
+def solve_full_pizza_vrptw_with_datetime(data, base_datetime=None):
+    """
+    Solves VRP with Time Windows using dynamic input data.
+    'data' should contain: num_vehicles, starts, ends, time_matrix, pickups_deliveries, demands, vehicle_capacities, time_windows
+    """
     # =========================================================================
     # 2. MODEL INITIALIZATION (Standard OR-Tools Setup)
     # =========================================================================
@@ -51,7 +25,7 @@ def solve_full_pizza_vrptw_with_datetime():
     demand_callback_index = routing.RegisterUnaryTransitCallback(demand_callback)
     routing.AddDimensionWithVehicleCapacity(demand_callback_index, 0, data['vehicle_capacities'], True, 'Capacity')
 
-    routing.AddDimension(transit_callback_index, 0, 600, False, 'Time')
+    routing.AddDimension(transit_callback_index, 0, 1440, False, 'Time') # Increased horizon to 1440 mins
     time_dimension = routing.GetDimensionOrDie('Time')
 
     for node, (earliest, latest) in enumerate(data['time_windows']):
@@ -76,8 +50,9 @@ def solve_full_pizza_vrptw_with_datetime():
     solution = routing.SolveWithParameters(search_params)
 
     results_sequence = []
-    # Using 'now' as the origin of time for demonstration
-    base_datetime = datetime.now().replace(second=0, microsecond=0)
+    # Using provided base_datetime or 'now' as the origin of time
+    if base_datetime is None:
+        base_datetime = datetime.now().replace(second=0, microsecond=0)
 
     if solution:
         for vehicle_id in range(data['num_vehicles']):
@@ -111,9 +86,9 @@ def solve_full_pizza_vrptw_with_datetime():
                     "shipper_id": vehicle_id,
                     "node": node_index,
                     "arrival_datetime": arr_dt.strftime("%Y-%m-%d %H:%M"),
-                    "load_after_action": load_after if not routing.IsEnd(index) else "Finished",
+                    "load_after_action": str(load_after) if not routing.IsEnd(index) else "Finished",
                     "action_amount": action_demand,
-                    "travel_time_minutes": travel_time_to_node,
+                    "travel_time_minutes": int(travel_time_to_node),
                     "lateness": lateness_val
                 })
                 
@@ -123,7 +98,32 @@ def solve_full_pizza_vrptw_with_datetime():
                 
     return results_sequence
 
-# Example Usage
-result_array = solve_full_pizza_vrptw_with_datetime()
-for entry in result_array:
-    print(entry)
+# Default fallback data for local testing
+DEFAULT_MOCK_DATA = {
+    'num_vehicles': 2,
+    'starts': [0, 1],
+    'ends': [0, 1],
+    'time_matrix': [
+        [0,  12,  0,  15, 12, 22,  0,  25],
+        [12,  0, 12,  20,  0, 10, 12,  18],
+        [0,  12,  0,  15, 12, 22,  0,  25],
+        [15, 20, 15,   0, 20, 14, 15,  30],
+        [12,  0, 12,  20,  0, 10, 12,  18],
+        [22, 10, 22,  14, 10,  0, 22,  15],
+        [0,  12,  0,  15, 12, 22,  0,  25],
+        [25, 18, 25,  30, 18, 15, 25,   0],
+    ],
+    'pickups_deliveries': [[2, 3], [4, 5], [6, 7]],
+    'demands': [0, 0, 1, -1, 1, -1, 1, -1],
+    'vehicle_capacities': [2, 2],
+    'time_windows': [
+        (0, 120), (0, 120), (0, 15), (10, 20),
+        (0, 15), (10, 20), (0, 25), (25, 35),
+    ]
+}
+
+if __name__ == "__main__":
+    # Example Usage
+    result_array = solve_full_pizza_vrptw_with_datetime(DEFAULT_MOCK_DATA)
+    for entry in result_array:
+        print(entry)

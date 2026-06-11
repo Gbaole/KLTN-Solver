@@ -29,11 +29,22 @@ class SchedulingRequest(BaseModel):
     flow_time_weight: int = 5
     makespan_weight: int = 1
 
+class VRPRequest(BaseModel):
+    num_vehicles: int
+    starts: List[int]
+    ends: List[int]
+    time_matrix: List[List[int]]
+    pickups_deliveries: List[List[int]]
+    demands: List[int]
+    vehicle_capacities: List[int]
+    time_windows: List[List[int]]
+    base_datetime: Optional[datetime] = None
+
 # --- Endpoints ---
 
 @app.get("/")
 async def root():
-    return {"message": "Welcome to the Pizza Optimization API. Available endpoints: /schedule, /network, /vrp"}
+    return {"message": "Welcome to the Pizza Optimization API. Available endpoints: /schedule, /network, /vrp (POST)"}
 
 @app.post("/schedule")
 async def schedule_pizza(request: SchedulingRequest):
@@ -61,13 +72,24 @@ async def network_optimization():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/vrp")
-async def vrp_optimization():
+@app.post("/vrp")
+async def vrp_optimization(request: VRPRequest):
     try:
-        results = solve_full_pizza_vrptw_with_datetime()
+        data = request.dict()
+        results = solve_full_pizza_vrptw_with_datetime(data, request.base_datetime)
+        return results
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/vrp-demo")
+async def vrp_demo():
+    try:
+        from VRP_DTime import DEFAULT_MOCK_DATA
+        results = solve_full_pizza_vrptw_with_datetime(DEFAULT_MOCK_DATA)
         return results
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
+
     uvicorn.run(app, host="0.0.0.0", port=8000)

@@ -21,12 +21,17 @@ def solve_pizza_scheduling(now_dt, chef_list, orders,
     min_deadline_offset = 0
     
     for o in orders:
-        if o['is_processing']:
-            rem_seconds = (o['finished_time_dt'] - now_dt).total_seconds()
-            rem_mins = math.ceil(rem_seconds / 60.0)
-            o['_calculated_duration'] = max(0, rem_mins)
+        if o['is_processing'] and o.get('pic'):
+            if o.get('finished_time_dt'):
+                rem_seconds = (o['finished_time_dt'] - now_dt).total_seconds()
+                rem_mins = math.ceil(rem_seconds / 60.0)
+                o['_calculated_duration'] = max(0, rem_mins)
+            else:
+                # Fallback: if processing but no end time, assume it just started
+                o['_calculated_duration'] = int(o['processing_time_mins'])
         else:
             o['_calculated_duration'] = int(o['processing_time_mins'])
+            o['is_processing'] = False # Ensure it's treated as Pending if no PIC or not processing
             
         total_duration += o['_calculated_duration']
         
