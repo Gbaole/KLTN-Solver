@@ -2,27 +2,7 @@ from ortools.linear_solver import pywraplp
 import math
 
 
-def solve_pizza_network_v2():
-    # --- 1. DATASET SETUP (15 Orders, 3 Stores) ---
-    stores = {
-        'S1': {'pos': (0, 0), 'init': 20},
-        'S2': {'pos': (10, 0), 'init': 50},  # Heavy Initial Load
-        'S3': {'pos': (5, 8), 'init': 15}
-    }
-
-    # Deterministic Order Placements
-    # (x, y, processing_time)
-    order_data = [
-        (1, 1, 15), (1, 2, 20), (0, 1, 10), (2, 1, 12), (1, 0, 18),
-        (9, 1, 15), (10, 2, 20), (11, 1, 25), (9, 0, 12), (10, 1, 10),
-        (5, 7, 20), (6, 8, 15), (4, 8, 22), (5, 9, 10), (5, 6, 18)
-    ]
-    orders = {f'Order_{i+1}': {'pos': (d[0], d[1]), 'time': d[2]}
-              for i, d in enumerate(order_data)}
-
-    alpha = 0.35  # Distance weight
-    beta = 0.85   # Workload weight
-
+def solve_pizza_network_v2(stores, orders, alpha=0.35, beta=0.85):
     # Pre-calculate Distance Matrix
     dist_matrix = {}
     for o_name, o_info in orders.items():
@@ -101,5 +81,21 @@ def solve_pizza_network_v2():
 
 
 if __name__ == "__main__":
-    res = solve_pizza_network_v2()
+    # --- 1. DATASET SETUP (15 Orders, 3 Stores) ---
+    stores = {
+        'S1': {'pos': (0, 0), 'init': 20},
+        'S2': {'pos': (10, 0), 'init': 50},  # Heavy Initial Load
+        'S3': {'pos': (5, 8), 'init': 15}
+    }
+
+    # Deterministic Order Placements
+    # (x, y, processing_time)
+    order_data = [
+        (1, 1, 15), (1, 2, 20), (0, 1, 10), (2, 1, 12), (1, 0, 18),
+        (9, 1, 15), (10, 2, 20), (11, 1, 25), (9, 0, 12), (10, 1, 10),
+        (5, 7, 20), (6, 8, 15), (4, 8, 22), (5, 9, 10), (5, 6, 18)
+    ]
+    orders = {f'Order_{i+1}': {'pos': (d[0], d[1]), 'time': d[2]}
+              for i, d in enumerate(order_data)}
+    res = solve_pizza_network_v2(stores, orders)
     print(res)

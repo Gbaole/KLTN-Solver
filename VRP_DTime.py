@@ -7,9 +7,12 @@ def solve_full_pizza_vrptw_with_datetime(data, base_datetime=None):
     Solves VRP with Time Windows using dynamic input data.
     'data' should contain: num_vehicles, starts, ends, time_matrix, pickups_deliveries, demands, vehicle_capacities, time_windows
     """
+    print(f"[VRP Solver] Starting solve with {data['num_vehicles']} vehicles and {len(data['time_matrix'])} nodes...")
+    
     # =========================================================================
     # 2. MODEL INITIALIZATION (Standard OR-Tools Setup)
     # =========================================================================
+    print("[VRP Solver] Initializing RoutingIndexManager...")
     manager = pywrapcp.RoutingIndexManager(len(data['time_matrix']), data['num_vehicles'], data['starts'], data['ends'])
     routing = pywrapcp.RoutingModel(manager)
 
@@ -22,17 +25,20 @@ def solve_full_pizza_vrptw_with_datetime(data, base_datetime=None):
     def demand_callback(from_index):
         return data['demands'][manager.IndexToNode(from_index)]
 
+    print("[VRP Solver] Adding Dimensions (Capacity & Time)...")
     demand_callback_index = routing.RegisterUnaryTransitCallback(demand_callback)
     routing.AddDimensionWithVehicleCapacity(demand_callback_index, 0, data['vehicle_capacities'], True, 'Capacity')
 
     routing.AddDimension(transit_callback_index, 0, 1440, False, 'Time') # Increased horizon to 1440 mins
     time_dimension = routing.GetDimensionOrDie('Time')
 
+    print("[VRP Solver] Setting Time Windows...")
     for node, (earliest, latest) in enumerate(data['time_windows']):
         index = manager.NodeToIndex(node)
         time_dimension.CumulVar(index).SetMin(earliest)
         time_dimension.SetCumulVarSoftUpperBound(index, latest, 100)
 
+    print("[VRP Solver] Adding Pickups and Deliveries constraints...")
     for request in data['pickups_deliveries']:
         p_idx, d_idx = manager.NodeToIndex(request[0]), manager.NodeToIndex(request[1])
         routing.AddPickupAndDelivery(p_idx, d_idx)
@@ -42,6 +48,7 @@ def solve_full_pizza_vrptw_with_datetime(data, base_datetime=None):
     # =========================================================================
     # 3. SOLVE & GENERATE DATETIME SEQUENCE
     # =========================================================================
+    print("[VRP Solver] Setting search parameters and solving...")
     search_params = pywrapcp.DefaultRoutingSearchParameters()
     search_params.first_solution_strategy = routing_enums_pb2.FirstSolutionStrategy.PARALLEL_CHEAPEST_INSERTION
     search_params.local_search_metaheuristic = routing_enums_pb2.LocalSearchMetaheuristic.GUIDED_LOCAL_SEARCH
@@ -55,6 +62,7 @@ def solve_full_pizza_vrptw_with_datetime(data, base_datetime=None):
         base_datetime = datetime.now().replace(second=0, microsecond=0)
 
     if solution:
+        print("[VRP Solver] Solution found! Formatting results...")
         for vehicle_id in range(data['num_vehicles']):
             index = routing.Start(vehicle_id)
             previous_time_mins = 0

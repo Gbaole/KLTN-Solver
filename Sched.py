@@ -3,8 +3,8 @@ from datetime import datetime, timedelta
 from ortools.sat.python import cp_model
 
 def solve_pizza_scheduling(now_dt, chef_list, orders, 
-                           tardiness_weight=1000, 
-                           flow_time_weight=5, 
+                           tardiness_weight=2000, 
+                           flow_time_weight=1100, 
                            makespan_weight=1):
     """
     Solves pizza scheduling by optimizing three competing objectives:
@@ -143,8 +143,12 @@ def solve_pizza_scheduling(now_dt, chef_list, orders,
     model.Minimize(total_tardiness_cost + weighted_flow_time + weighted_makespan)
 
     # Solve
+    print(f"[Kitchen Solver] Starting solve for {len(orders)} orders and {len(chef_list)} chefs...")
     solver = cp_model.CpSolver()
+    solver.parameters.max_time_in_seconds = 10.0 # Prevent infinite hang
+    
     status = solver.Solve(model)
+    print(f"[Kitchen Solver] Solve status: {solver.StatusName(status)}")
 
     # -------------------------------------------------------------------------
     # 4. POST-PROCESSING: Translate Solver Integers back to Datetimes & Slacks
@@ -153,6 +157,7 @@ def solve_pizza_scheduling(now_dt, chef_list, orders,
     solver_stats = {}
     
     if status in (cp_model.OPTIMAL, cp_model.FEASIBLE):
+        print("[Kitchen Solver] Solution found! Formatting results...")
         solver_stats['makespan_minutes'] = solver.Value(makespan)
         solver_stats['makespan_datetime'] = now_dt + timedelta(minutes=solver.Value(makespan))
         

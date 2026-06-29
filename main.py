@@ -49,8 +49,9 @@ async def root():
 @app.post("/schedule")
 async def schedule_pizza(request: SchedulingRequest):
     try:
+        print(f"[API] Received /schedule request for {len(request.orders)} orders and {len(request.chef_list)} chefs.")
         # Convert Pydantic orders to list of dicts as expected by solve_pizza_scheduling
-        orders_dict = [order.dict() for order in request.orders]
+        orders_dict = [order.model_dump() for order in request.orders]
         
         schedule, stats = solve_pizza_scheduling(
             request.now_dt, 
@@ -60,22 +61,66 @@ async def schedule_pizza(request: SchedulingRequest):
             request.flow_time_weight,
             request.makespan_weight
         )
+        print("[API] Kitchen Solver finished.")
         return {"schedule": schedule, "stats": stats}
     except Exception as e:
+        print(f"[API] Error in /schedule: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/network")
-async def network_optimization():
+class OptimizationRequest(BaseModel):
+    stores: dict
+    orders: dict
+    now_dt: datetime
+    chef_lists: dict
+    vrp_data_templates: dict
+
+@app.post("/optimize-all")
+async def optimize_all(request: OptimizationRequest):
     try:
-        results = solve_pizza_network_v2()
-        return results
+        # 1. Allocation
+        allocations = solve_pizza_network_v2(request.stores, request.orders)
+        if allocations['status'] != 'SUCCESS':
+            raise HTTPException(status_code=500, detail="Allocation failed")
+            
+        # 2. Scheduling per store
+        all_schedules = {}
+        for store_name in request.stores.keys():
+            # Filter orders for this store
+            store_orders = [
+                {
+                    'id': assn['order'],
+                    'is_processing': False, # Assuming new orders for this flow
+                    'pic': None,
+                    'finished_time_dt': None,
+                    'deadline_dt': request.orders[assn['order']].get('deadline_dt', request.now_dt + timedelta(hours=1)),
+                    'processing_time_mins': assn['time_min']
+                }
+                for assn in allocations['assignments'] if assn['store'] == store_name
+            ]
+            
+            if store_orders:
+                schedule, stats = solve_pizza_scheduling(
+                    request.now_dt,
+                    request.chef_lists.get(store_name, []),
+                    store_orders
+                )
+                all_schedules[store_name] = {"schedule": schedule, "stats": stats}
+            else:
+                all_schedules[store_name] = {"schedule": [], "stats": {}}
+        
+        # 3. Routing (This is a simplification, assumes VRP needs all deliveries)
+        # We need to construct the VRP request from the scheduling results
+        # This part requires mapping scheduling results to the VRP data format
+        
+        # NOTE: For now, return the allocation and schedules as the intermediate step
+        return {"allocations": allocations, "schedules": all_schedules}
+        
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
 @app.post("/vrp")
 async def vrp_optimization(request: VRPRequest):
     try:
-        data = request.dict()
+        data = request.model_dump()
         results = solve_full_pizza_vrptw_with_datetime(data, request.base_datetime)
         return results
     except Exception as e:
