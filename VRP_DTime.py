@@ -36,7 +36,10 @@ def solve_full_pizza_vrptw_with_datetime(data, base_datetime=None):
     for node, (earliest, latest) in enumerate(data['time_windows']):
         index = manager.NodeToIndex(node)
         time_dimension.CumulVar(index).SetMin(earliest)
-        time_dimension.SetCumulVarSoftUpperBound(index, latest, 100)
+        time_dimension.SetCumulVarSoftUpperBound(index, latest, 1000)
+
+    print("[VRP Solver] Adding global span cost coefficient to balance routes across shippers...")
+    time_dimension.SetGlobalSpanCostCoefficient(5000)
 
     print("[VRP Solver] Adding Pickups and Deliveries constraints...")
     for request in data['pickups_deliveries']:
@@ -52,7 +55,7 @@ def solve_full_pizza_vrptw_with_datetime(data, base_datetime=None):
     search_params = pywrapcp.DefaultRoutingSearchParameters()
     search_params.first_solution_strategy = routing_enums_pb2.FirstSolutionStrategy.PARALLEL_CHEAPEST_INSERTION
     search_params.local_search_metaheuristic = routing_enums_pb2.LocalSearchMetaheuristic.GUIDED_LOCAL_SEARCH
-    search_params.time_limit.seconds = 5
+    search_params.time_limit.seconds = 25
 
     solution = routing.SolveWithParameters(search_params)
 

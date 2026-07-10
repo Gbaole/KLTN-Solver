@@ -145,7 +145,7 @@ def solve_pizza_scheduling(now_dt, chef_list, orders,
     # Solve
     print(f"[Kitchen Solver] Starting solve for {len(orders)} orders and {len(chef_list)} chefs...")
     solver = cp_model.CpSolver()
-    solver.parameters.max_time_in_seconds = 10.0 # Prevent infinite hang
+    solver.parameters.max_time_in_seconds = 15.0 # Prevent infinite hang
     
     status = solver.Solve(model)
     print(f"[Kitchen Solver] Solve status: {solver.StatusName(status)}")
