@@ -12,7 +12,17 @@ def solve_pizza_network_v2(stores, orders, alpha=0.35, beta=0.85):
                           (o_info['pos'][1] - s_info['pos'][1])**2)
             dist_matrix[o_name][s_name] = round(d, 2)
 
-    # --- 2. SOLVER CONFIG ---
+    # --- 2. NORMALIZATION FACTORS ---
+    all_dists = [dist_matrix[o][s] for o in orders for s in stores]
+    avg_dist = sum(all_dists) / len(all_dists) if all_dists else 1.0
+    if avg_dist == 0:
+        avg_dist = 1.0
+
+    total_order_time = sum(orders[o]['time'] for o in orders)
+    avg_w_max = (sum(stores[s]['init'] for s in stores) / len(stores) +
+                 total_order_time / len(stores))
+
+    # --- 3. SOLVER CONFIG ---
     solver = pywraplp.Solver.CreateSolver('SCIP')
     x = {}
     for o in orders:
@@ -20,7 +30,7 @@ def solve_pizza_network_v2(stores, orders, alpha=0.35, beta=0.85):
             x[o, s] = solver.IntVar(0, 1, f'x_{o}_{s}')
     w_max = solver.NumVar(0, solver.infinity(), 'w_max')
 
-    # --- 3. CONSTRAINTS ---
+    # --- 4. CONSTRAINTS ---
     for o in orders:
         solver.Add(solver.Sum([x[o, s] for s in stores]) == 1)
 
@@ -29,10 +39,11 @@ def solve_pizza_network_v2(stores, orders, alpha=0.35, beta=0.85):
             solver.Sum([x[o, s] * orders[o]['time'] for o in orders])
         solver.Add(total_time <= w_max)
 
-    # --- 4. OBJECTIVE ---
+    # --- 5. OBJECTIVE (normalized) ---
     total_network_dist = solver.Sum(
         [x[o, s] * dist_matrix[o][s] for o in orders for s in stores])
-    solver.Minimize(alpha * total_network_dist + beta * w_max)
+    solver.Minimize(alpha * (total_network_dist / avg_dist) +
+                    beta * (w_max / avg_w_max))
 
     # --- 5. EXECUTION & DETAILED OUTPUT ---
     status = solver.Solve()
